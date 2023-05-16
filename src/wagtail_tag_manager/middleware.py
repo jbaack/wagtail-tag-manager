@@ -7,6 +7,8 @@ from wagtail_tag_manager.utils import set_consent
 from wagtail_tag_manager.models import Tag
 from wagtail_tag_manager.strategy import TagStrategy
 
+from wagtail.models import Site
+
 
 class BaseMiddleware:
     def __init__(self, get_response):
@@ -18,10 +20,12 @@ class CookieConsentMiddleware(BaseMiddleware):
         return self.get_response(request)
 
     def process_template_response(self, request, response):
+        site = Site.find_for_request(request)
         if (
             getattr(request, "method", None) == "GET"
             and getattr(response, "status_code", None) == 200
             and not getattr(response, "streaming", False)
+            and site
         ):
             strategy = TagStrategy(request)
             set_consent(
@@ -47,7 +51,8 @@ class TagManagerMiddleware(BaseMiddleware):
         return response
 
     def _add_instant_tags(self, request, response):
-        if hasattr(response, "content") and getattr(settings, "WTM_INJECT_TAGS", True):
+        site = Site.find_for_request(request)
+        if hasattr(response, "content") and getattr(settings, "WTM_INJECT_TAGS", True) and site:
             strategy = TagStrategy(request)
             content = response.content.decode(response.charset)
             doc = BeautifulSoup(content, "html.parser")
